@@ -207,6 +207,4 @@ def get_predictions(
 
     valid_bbox_indices = batched_nms(n_pred[:, 1:5].clone(), n_pred[:, 5].clone(), n_pred[:, 7].clone(), nms_confidence_level)
 
-    if len(valid_bbox_indices):
-        return n_pred[valid_bbox_indices, :]
-    return None
+    return n_pred[valid_bbox_indices, :] if len(valid_bbox_indices) else None
