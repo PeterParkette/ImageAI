@@ -185,10 +185,10 @@ class DetectionModelTrainer:
         self.__train_epochs = num_experiments
         self.__pre_trained_model = train_from_pretrained_model
 
-        json_data = dict()
-        json_data["labels"] = self.__model_labels
-        json_data["anchors"] = self.__inference_anchors
-
+        json_data = {
+            "labels": self.__model_labels,
+            "anchors": self.__inference_anchors,
+        }
         with open(os.path.join(self.__json_directory, "detection_config.json"), "w+") as json_file:
             json.dump(json_data, json_file, indent=4, separators=(",", " : "),
                       ensure_ascii=True)
@@ -343,17 +343,15 @@ class DetectionModelTrainer:
         with open(json_path, 'r') as json_file:
             detection_model_json = json.load(json_file)
 
-        temp_anchor_array = []
         new_anchor_array = []
 
-        temp_anchor_array.append(detection_model_json["anchors"][2])
-        temp_anchor_array.append(detection_model_json["anchors"][1])
-        temp_anchor_array.append(detection_model_json["anchors"][0])
-
+        temp_anchor_array = [
+            detection_model_json["anchors"][2],
+            detection_model_json["anchors"][1],
+            detection_model_json["anchors"][0],
+        ]
         for aa in temp_anchor_array:
-            for aaa in aa:
-                new_anchor_array.append(aaa)
-
+            new_anchor_array.extend(iter(aa))
         self.__model_anchors = new_anchor_array
         self.__model_labels = detection_model_json["labels"]
         self.__num_objects = len(self.__model_labels)
@@ -377,8 +375,9 @@ class DetectionModelTrainer:
         if len(valid_ints) == 0:
             print('Validation samples were not provided.')
             print('Please, check your validation samples are correctly provided:')
-            print('\tAnnotations: {}\n\tImages: {}'.format(self.__validation_annotations_folder,
-                                                           self.__validation_images_folder))
+            print(
+                f'\tAnnotations: {self.__validation_annotations_folder}\n\tImages: {self.__validation_images_folder}'
+            )
 
         valid_generator = BatchGenerator(
             instances=valid_ints,
@@ -394,7 +393,7 @@ class DetectionModelTrainer:
             norm=normalize
         )
 
-        results = list()
+        results = []
 
         if os.path.isfile(model_path):
             # model_files must be a list containing the complete path to the files,
@@ -406,7 +405,9 @@ class DetectionModelTrainer:
             model_files = sorted([os.path.join(model_path, file_name) for file_name in os.listdir(model_path)])
             # sort the files to make sure we're always evaluating them on same order
         else:
-            print('model_path must be the path to a .h5 file or a directory. Found {}'.format(model_path))
+            print(
+                f'model_path must be the path to a .h5 file or a directory. Found {model_path}'
+            )
             return results
 
         for model_file in model_files:
@@ -426,8 +427,8 @@ class DetectionModelTrainer:
                         'using_iou': iou_threshold,
                         'using_object_threshold': object_threshold,
                         'using_non_maximum_suppression': nms_threshold,
-                        'average_precision': dict(),
-                        'evaluation_samples': len(valid_ints)
+                        'average_precision': {},
+                        'evaluation_samples': len(valid_ints),
                     }
                     # print the score
                     print("Model File: ", model_file, '\n')
@@ -446,10 +447,12 @@ class DetectionModelTrainer:
 
                     results.append(result_dict)
                 except Exception as e:
-                    print('skipping the evaluation of {} because following exception occurred: {}'.format(model_file, e))
+                    print(
+                        f'skipping the evaluation of {model_file} because following exception occurred: {e}'
+                    )
                     continue
             else:
-                print('skipping the evaluation of {} since it\'s not a .h5 file'.format(model_file))
+                print(f"skipping the evaluation of {model_file} since it\'s not a .h5 file")
 
         return results
 
@@ -470,8 +473,9 @@ class DetectionModelTrainer:
 
         if os.path.exists(valid_annot_folder):
             valid_ints, valid_labels = parse_voc_annotation(valid_annot_folder, valid_image_folder, valid_cache, labels)
-            print('Evaluating over {} samples taken from {}'.format(len(valid_ints),
-                                                                    os.path.dirname(valid_annot_folder)))
+            print(
+                f'Evaluating over {len(valid_ints)} samples taken from {os.path.dirname(valid_annot_folder)}'
+            )
         else:
 
             train_portion = 0.8  # use 80% to train and the remaining 20% to evaluate
@@ -486,7 +490,9 @@ class DetectionModelTrainer:
                                        (1 - train_portion)*100,
                                        os.path.dirname(train_annot_folder)))
 
-        print('Training over {} samples  given at {}'.format(len(train_ints), os.path.dirname(train_annot_folder)))
+        print(
+            f'Training over {len(train_ints)} samples  given at {os.path.dirname(train_annot_folder)}'
+        )
 
         # compare the seen labels with the given labels in config.json
         if len(labels) > 0:
@@ -504,7 +510,9 @@ class DetectionModelTrainer:
 
             labels = train_labels.keys()
 
-        max_box_per_image = max([len(inst['object']) for inst in (train_ints + valid_ints)])
+        max_box_per_image = max(
+            len(inst['object']) for inst in (train_ints + valid_ints)
+        )
 
         return train_ints, valid_ints, sorted(labels), max_box_per_image
 
@@ -588,10 +596,9 @@ class DetectionModelTrainer:
             if self.__training_mode:
                 print("Training with transfer learning from pretrained Model")
             template_model.load_weights(self.__pre_trained_model, by_name=True)
-        else:
-            if self.__training_mode:
-                print("Pre-trained Model not provided. Transfer learning not in use.")
-                print("Training will start with 3 warmup experiments")
+        elif self.__training_mode:
+            print("Pre-trained Model not provided. Transfer learning not in use.")
+            print("Training will start with 3 warmup experiments")
 
         if len(multi_gpu) > 1:
             train_model = multi_gpu_model(template_model, gpus=multi_gpu)
@@ -741,121 +748,121 @@ class CustomObjectDetection:
 
         if self.__model is None:
             raise ValueError("You must call the loadModel() function before making object detection.")
-        else:
-            if output_type == "file":
-                # from the image file, lets keep the directory and the filename, but remove its  format
-                # if output_image_path is path/to/the/output/image.png
-                # then output_image_folder is  path/to/the/output/image
-                # let's check if it is in the appropriated format soon to fail early
-                output_image_folder, n_subs = re.subn(r'\.(?:jpe?g|png|tif|webp|PPM|PGM)$', '', output_image_path, flags=re.I)
-                if n_subs == 0:
+        if output_type == "file":
+            # from the image file, lets keep the directory and the filename, but remove its  format
+            # if output_image_path is path/to/the/output/image.png
+            # then output_image_folder is  path/to/the/output/image
+            # let's check if it is in the appropriated format soon to fail early
+            output_image_folder, n_subs = re.subn(r'\.(?:jpe?g|png|tif|webp|PPM|PGM)$', '', output_image_path, flags=re.I)
+            if n_subs == 0:
                     # if no substitution was done, the given output_image_path is not in a supported format,
                     # raise an error
-                    raise ValueError("output_image_path must be the path where to write the image. "
-                                     "Therefore it must end as one the following: "
-                                     "'.jpg', '.png', '.tif', '.webp', '.PPM', '.PGM'. {} found".format(output_image_path))
-                elif extract_detected_objects:
+                raise ValueError(
+                    f"output_image_path must be the path where to write the image. Therefore it must end as one the following: '.jpg', '.png', '.tif', '.webp', '.PPM', '.PGM'. {output_image_path} found"
+                )
+            elif extract_detected_objects:
                     # Results must be written as files and need to extract detected objects as images,
                     # let's create a folder to store the object's images
-                    objects_dir = output_image_folder + "-objects"
+                objects_dir = f"{output_image_folder}-objects"
 
-                    os.makedirs(objects_dir, exist_ok=True)
+                os.makedirs(objects_dir, exist_ok=True)
 
-            self.__object_threshold = minimum_percentage_probability / 100
-            self.__nms_threshold = nms_treshold
+        self.__object_threshold = minimum_percentage_probability / 100
+        self.__nms_threshold = nms_treshold
+
+        if input_type == "file":
+            image = cv2.imread(input_image)
+        elif input_type == "array":
+            image = input_image
+        else:
+            raise ValueError(f"input_type must be 'file' or 'array'. {input_type} found")
+
+        image_frame = image.copy()
+
+        height, width, channels = image.shape
+
+        image = cv2.resize(image, (self.__input_size, self.__input_size))
+
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        image = image.astype("float32") / 255.
+
+        # expand the image to batch
+        image = np.expand_dims(image, 0)
+
+        if self.__model_type == "yolov3":
+            if thread_safe == True:
+                with K.get_session().graph.as_default():
+                    yolo_results = self.__model.predict(image)
+            else:
+                yolo_results = self.__model.predict(image)
+
+            boxes = []
+
+            for idx, result in enumerate(yolo_results):
+                box_set = self.__detection_utils.decode_netout(result[0], self.__model_anchors[idx],
+                                                               self.__object_threshold, self.__input_size,
+                                                               self.__input_size)
+                boxes += box_set
+
+            self.__detection_utils.correct_yolo_boxes(boxes, height, width, self.__input_size, self.__input_size)
+
+            self.__detection_utils.do_nms(boxes, self.__nms_threshold)
+
+            all_boxes, all_labels, all_scores = self.__detection_utils.get_boxes(boxes, self.__model_labels,
+                                                                                 self.__object_threshold)
 
             output_objects_array = []
+            for object_box, object_label, object_score in zip(all_boxes, all_labels, all_scores):
+                object_box.xmin = max(object_box.xmin, 0)
+                object_box.ymin = max(object_box.ymin, 0)
+                each_object_details = {
+                    "name": object_label,
+                    "percentage_probability": object_score,
+                    "box_points": [
+                        object_box.xmin,
+                        object_box.ymin,
+                        object_box.xmax,
+                        object_box.ymax,
+                    ],
+                }
+                output_objects_array.append(each_object_details)
+
+            drawn_image = self.__detection_utils.draw_boxes_and_caption(image_frame.copy(), all_boxes, all_labels,
+                                                                        all_scores, show_names=display_object_name,
+                                                                        show_percentage=display_percentage_probability)
+
             detected_objects_image_array = []
 
-            if input_type == "file":
-                image = cv2.imread(input_image)
-            elif input_type == "array":
-                image = input_image
-            else:
-                raise ValueError("input_type must be 'file' or 'array'. {} found".format(input_type))
+            if extract_detected_objects:
 
-            image_frame = image.copy()
+                for cnt, each_object in enumerate(output_objects_array):
 
-            height, width, channels = image.shape
-
-            image = cv2.resize(image, (self.__input_size, self.__input_size))
-
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-            image = image.astype("float32") / 255.
-
-            # expand the image to batch
-            image = np.expand_dims(image, 0)
-
-            if self.__model_type == "yolov3":
-                if thread_safe == True:
-                    with K.get_session().graph.as_default():
-                        yolo_results = self.__model.predict(image)
-                else:
-                    yolo_results = self.__model.predict(image)
-
-                boxes = list()
-
-                for idx, result in enumerate(yolo_results):
-                    box_set = self.__detection_utils.decode_netout(result[0], self.__model_anchors[idx],
-                                                                   self.__object_threshold, self.__input_size,
-                                                                   self.__input_size)
-                    boxes += box_set
-
-                self.__detection_utils.correct_yolo_boxes(boxes, height, width, self.__input_size, self.__input_size)
-
-                self.__detection_utils.do_nms(boxes, self.__nms_threshold)
-
-                all_boxes, all_labels, all_scores = self.__detection_utils.get_boxes(boxes, self.__model_labels,
-                                                                                     self.__object_threshold)
-
-                for object_box, object_label, object_score in zip(all_boxes, all_labels, all_scores):
-                    each_object_details = dict()
-                    each_object_details["name"] = object_label
-                    each_object_details["percentage_probability"] = object_score
-
-                    if object_box.xmin < 0:
-                        object_box.xmin = 0
-                    if object_box.ymin < 0:
-                        object_box.ymin = 0
-
-                    each_object_details["box_points"] = [object_box.xmin, object_box.ymin, object_box.xmax, object_box.ymax]
-                    output_objects_array.append(each_object_details)
-
-                drawn_image = self.__detection_utils.draw_boxes_and_caption(image_frame.copy(), all_boxes, all_labels,
-                                                                            all_scores, show_names=display_object_name,
-                                                                            show_percentage=display_percentage_probability)
-
-                if extract_detected_objects:
-
-                    for cnt, each_object in enumerate(output_objects_array):
-
-                        splitted_image = image_frame[each_object["box_points"][1]:each_object["box_points"][3],
-                                                     each_object["box_points"][0]:each_object["box_points"][2]]
-                        if output_type == "file":
-                            splitted_image_path = os.path.join(objects_dir, "{}-{:05d}.jpg".format(each_object["name"],
-                                                                                                   cnt))
-
-                            cv2.imwrite(splitted_image_path, splitted_image)
-                            detected_objects_image_array.append(splitted_image_path)
-                        elif output_type == "array":
-                            detected_objects_image_array.append(splitted_image.copy())
-
-                if output_type == "file":
-                    # we already validated that the output_image_path is a supported by OpenCV one
-                    cv2.imwrite(output_image_path, drawn_image)
-
-                if extract_detected_objects:
+                    splitted_image = image_frame[each_object["box_points"][1]:each_object["box_points"][3],
+                                                 each_object["box_points"][0]:each_object["box_points"][2]]
                     if output_type == "file":
-                        return output_objects_array, detected_objects_image_array
-                    elif output_type == "array":
-                        return drawn_image, output_objects_array, detected_objects_image_array
+                        splitted_image_path = os.path.join(objects_dir, "{}-{:05d}.jpg".format(each_object["name"],
+                                                                                               cnt))
 
-                else:
-                    if output_type == "file":
-                        return output_objects_array
+                        cv2.imwrite(splitted_image_path, splitted_image)
+                        detected_objects_image_array.append(splitted_image_path)
                     elif output_type == "array":
-                        return drawn_image, output_objects_array
+                        detected_objects_image_array.append(splitted_image.copy())
+
+            if output_type == "file":
+                # we already validated that the output_image_path is a supported by OpenCV one
+                cv2.imwrite(output_image_path, drawn_image)
+
+            if extract_detected_objects:
+                if output_type == "array":
+                    return drawn_image, output_objects_array, detected_objects_image_array
+
+                elif output_type == "file":
+                    return output_objects_array, detected_objects_image_array
+            elif output_type == "array":
+                return drawn_image, output_objects_array
+            elif output_type == "file":
+                return output_objects_array
 
 
 class CustomVideoObjectDetection:
@@ -916,16 +923,15 @@ class CustomVideoObjectDetection:
         :return:
         """
 
-        if (self.__model_loaded == False):
-            if(self.__model_type == "yolov3"):
-                detector = CustomObjectDetection()
-                detector.setModelTypeAsYOLOv3()
-                detector.setModelPath(self.__model_path)
-                detector.setJsonPath(self.__detection_config_json_path)
-                detector.loadModel()
+        if (self.__model_loaded == False) and (self.__model_type == "yolov3"):
+            detector = CustomObjectDetection()
+            detector.setModelTypeAsYOLOv3()
+            detector.setModelPath(self.__model_path)
+            detector.setJsonPath(self.__detection_config_json_path)
+            detector.loadModel()
 
-                self.__detector = detector
-                self.__model_loaded = True
+            self.__detector = detector
+            self.__model_loaded = True
 
 
     def detectObjectsFromVideo(self, input_file_path="", camera_input=None, output_file_path="", frames_per_second=20,

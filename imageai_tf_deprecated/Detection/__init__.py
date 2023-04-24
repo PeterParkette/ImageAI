@@ -134,66 +134,72 @@ class ObjectDetection:
                 :return:
         """
 
-        if (self.__modelType == "retinanet"):
-            if (detection_speed == "normal"):
-                self.__input_image_min = 800
-                self.__input_image_max = 1333
-            elif (detection_speed == "fast"):
+        if self.__modelType == "retinanet":
+            if detection_speed == "fast":
                 self.__input_image_min = 400
                 self.__input_image_max = 700
-            elif (detection_speed == "faster"):
+            elif detection_speed == "faster":
                 self.__input_image_min = 300
                 self.__input_image_max = 500
-            elif (detection_speed == "fastest"):
+            elif detection_speed == "fastest":
                 self.__input_image_min = 200
                 self.__input_image_max = 350
-            elif (detection_speed == "flash"):
+            elif detection_speed == "flash":
                 self.__input_image_min = 100
                 self.__input_image_max = 250
-        elif (self.__modelType == "yolov3"):
-            if (detection_speed == "normal"):
-                self.__yolo_model_image_size = (416, 416)
-            elif (detection_speed == "fast"):
-                self.__yolo_model_image_size = (320, 320)
-            elif (detection_speed == "faster"):
-                self.__yolo_model_image_size = (208, 208)
-            elif (detection_speed == "fastest"):
-                self.__yolo_model_image_size = (128, 128)
-            elif (detection_speed == "flash"):
-                self.__yolo_model_image_size = (96, 96)
-
-        elif (self.__modelType == "tinyyolov3"):
-            if (detection_speed == "normal"):
-                self.__yolo_model_image_size = (832, 832)
-            elif (detection_speed == "fast"):
+            elif detection_speed == "normal":
+                self.__input_image_min = 800
+                self.__input_image_max = 1333
+        elif self.__modelType == "tinyyolov3":
+            if detection_speed == "fast":
                 self.__yolo_model_image_size = (576, 576)
-            elif (detection_speed == "faster"):
+            elif detection_speed == "faster":
                 self.__yolo_model_image_size = (416, 416)
-            elif (detection_speed == "fastest"):
+            elif detection_speed == "fastest":
                 self.__yolo_model_image_size = (320, 320)
-            elif (detection_speed == "flash"):
+            elif detection_speed == "flash":
                 self.__yolo_model_image_size = (272, 272)
 
-        if (self.__modelLoaded == False):
-            if (self.__modelType == ""):
+            elif detection_speed == "normal":
+                self.__yolo_model_image_size = (832, 832)
+        elif self.__modelType == "yolov3":
+            if detection_speed == "fast":
+                self.__yolo_model_image_size = (320, 320)
+            elif detection_speed == "faster":
+                self.__yolo_model_image_size = (208, 208)
+            elif detection_speed == "fastest":
+                self.__yolo_model_image_size = (128, 128)
+            elif detection_speed == "flash":
+                self.__yolo_model_image_size = (96, 96)
+
+            elif detection_speed == "normal":
+                self.__yolo_model_image_size = (416, 416)
+        if (self.__modelType == ""):
+            if (self.__modelLoaded == False):
                 raise ValueError("You must set a valid model type before loading the model.")
-            elif (self.__modelType == "retinanet"):
+        elif (self.__modelType == "retinanet"):
+            if (self.__modelLoaded == False):
                 model = retinanet_models.load_model(self.modelPath, backbone_name='resnet50')
                 self.__model_collection.append(model)
                 self.__modelLoaded = True
-            elif (self.__modelType == "yolov3" or self.__modelType == "tinyyolov3"):
+        elif self.__modelType in ["yolov3", "tinyyolov3"]:
+            if (self.__modelLoaded == False):
 
                 input_image = Input(shape=(None, None, 3))
 
-                if self.__modelType == "yolov3":
-                    model = yolov3_main(input_image, len(self.__yolo_anchors),
-                                    len(self.numbers_to_names.keys()))
-                else:
-                    model = tiny_yolov3_main(input_image, 3,
-                                 len(self.numbers_to_names.keys()))
-
+                model = (
+                    yolov3_main(
+                        input_image,
+                        len(self.__yolo_anchors),
+                        len(self.numbers_to_names.keys()),
+                    )
+                    if self.__modelType == "yolov3"
+                    else tiny_yolov3_main(
+                        input_image, 3, len(self.numbers_to_names.keys())
+                    )
+                )
                 model.load_weights(self.modelPath)
-               
+
                 self.__model_collection.append(model)
                 self.__modelLoaded = True
 
@@ -274,8 +280,8 @@ class ObjectDetection:
         elif (self.__modelLoaded == True):
             try:
 
-                model_detections = list()
-                detections = list()
+                model_detections = []
+                detections = []
                 image_copy = None
 
                 detected_objects_image_array = []
@@ -289,7 +295,7 @@ class ObjectDetection:
                 detected_copy = input_image
                 image_copy = input_image
 
-                if (self.__modelType == "yolov3" or self.__modelType == "tinyyolov3"):
+                if self.__modelType in ["yolov3", "tinyyolov3"]:
 
                     image_h, image_w, _ = detected_copy.shape
                     detected_copy = preprocess_input(detected_copy, self.__yolo_model_image_size)
@@ -304,7 +310,7 @@ class ObjectDetection:
                             self.__yolo_model_image_size,
                             (image_w, image_h),
                             self.numbers_to_names)
-                            
+
                 elif (self.__modelType == "retinanet"):
                     detected_copy = preprocess_image(detected_copy)
                     detected_copy, scale = resize_image(detected_copy)
@@ -312,7 +318,7 @@ class ObjectDetection:
                     model = self.__model_collection[0]
                     boxes, scores, labels = model.predict_on_batch(np.expand_dims(detected_copy, axis=0))
 
-                    
+
                     boxes /= scale
 
                     for box, score, label in zip(boxes[0], scores[0], labels[0]):
@@ -320,14 +326,15 @@ class ObjectDetection:
                         if score < min_probability:
                             break
 
-                        detection_dict = dict()
-                        detection_dict["name"] = self.numbers_to_names[label]
-                        detection_dict["percentage_probability"] = score * 100
-                        detection_dict["box_points"] = box.astype(int).tolist()
+                        detection_dict = {
+                            "name": self.numbers_to_names[label],
+                            "percentage_probability": score * 100,
+                            "box_points": box.astype(int).tolist(),
+                        }
                         model_detections.append(detection_dict)
 
                 counting = 0
-                objects_dir = output_image_path + "-objects"
+                objects_dir = f"{output_image_path}-objects"
 
                 for detection in model_detections:
                     counting += 1
@@ -335,10 +342,11 @@ class ObjectDetection:
                     percentage_probability = detection["percentage_probability"]
                     box_points = detection["box_points"]
 
-                    if (custom_objects is not None):
-                        if (custom_objects[label] != "valid"):
-                            continue
-                    
+                    if (custom_objects is not None) and (
+                        custom_objects[label] != "valid"
+                    ):
+                        continue
+
                     detections.append(detection)
 
                     if display_object_name == False:
@@ -347,15 +355,15 @@ class ObjectDetection:
                     if display_percentage_probability == False:
                         percentage_probability = None
 
-                    
+
                     image_copy = draw_boxes(image_copy, 
                                     box_points,
                                     display_box,
                                     label, 
                                     percentage_probability, 
                                     self.__box_color)
-                    
-                    
+
+
 
                     if (extract_detected_objects == True):
                         splitted_copy = image_copy.copy()[box_points[1]:box_points[3],
@@ -371,22 +379,21 @@ class ObjectDetection:
                         elif (output_type == "array"):
                             detected_objects_image_array.append(splitted_copy)
 
-                
+
                 if (output_type == "file"):
                     cv2.imwrite(output_image_path, image_copy)
 
                 if (extract_detected_objects == True):
-                    if (output_type == "file"):
-                        return detections, detected_objects_image_array
-                    elif (output_type == "array"):
+                    if output_type == "array":
                         return image_copy, detections, detected_objects_image_array
 
-                else:
-                    if (output_type == "file"):
-                        return detections
-                    elif (output_type == "array"):
-                        return image_copy, detections
+                    elif output_type == "file":
+                        return detections, detected_objects_image_array
+                elif output_type == "array":
+                    return image_copy, detections
 
+                elif output_type == "file":
+                    return detections
             except:
                 raise ValueError(
                     "Ensure you specified correct input image, input type, output type and/or output image path ")
